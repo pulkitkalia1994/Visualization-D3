@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.area {
+  fill: steelblue;
+  clip-path: url(#clip);
+}
+
+.zoom {
+  cursor: move;
+  fill: none;
+  pointer-events: all;
+}
+
+</style>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<hidden id="hidden" value="0">
+     Choose a country:
+  <div style="height:100px;width:100px;margin-left:20px">
+  </div>
+<script>
+  d3.csv("valuesforDD.csv", function(error, data) {
+    var select = d3.select("div")
+      .append("select").attr('size',5).attr('id','country');
+
+ document.getElementById('country').value="Angola";
+    select
+      .on("change", function(d) {
+        var value = d3.select(this).property("value");
+        display();
+      });
+
+    select.selectAll("option")
+      .data(data)
+      .enter()
+        .append("option")
+        .attr("value", function (d) { return d.value; })
+        .text(function (d) { return d.label; }).style("float","right");
+
+        document.getElementById('country').value="Angola";
+
+  });
+//select.attr("selected","")
+  </script>
+  <div class="menu" id="menu" style="float:right;margin-top:-100px;margin-right:900px">
+  <select id="dropdown" onchange="display()" size="5">
+  <option value="null">Choose a variable</option>
+  <option value="pf_ss_women_fgm">Female genital mutilation</option>
+  <option value="pf_ss_women_missing">Women missing</option>
+  <option value="pf_ss_women_inheritance_widows">Widow inheritance rights</option>
+  <option value="pf_ss_women_inheritance_daughters">Daughter inheritance rights</option>
+  <option value="pf_ss_women_inheritance">Total women inheritance</option>
+  <option value="pf_ss_women">Safety and security of women</option>
+  <option value="pf_movement_women">Women's movement</option>
+  <option value="ef_score">Economic Freedom score</option>
+  <option value="hf_score">Human Freedom score</option>
+
+    </select>
+  </div>
+
+
+<script>
+function display(){
+var menu=document.getElementById('dropdown').value;
+var country=document.getElementById('country').value;
+d3.select('svg').remove();
+d3.select('body').append('svg').attr('height',500).attr('width',525)
+var svg = d3.select("svg"),
+    margin = {top: 40, right: 20, bottom: 110, left: 40},
+    margin2 = {top: 430, right: 20, bottom: 30, left: 40},
+    width = +svg.attr("width") - margin.left - margin.right,
+    height = +svg.attr("height") - margin.top - margin.bottom,
+    height2 = +svg.attr("height") - margin2.top - margin2.bottom;
+
+var parseDate = d3.timeFormat("%Y");
+
+var x = d3.scaleTime().range([0, width]),
+    x2 = d3.scaleTime().range([0, width]),
+    y = d3.scaleLinear().range([height, 0]),
+    y2 = d3.scaleLinear().range([height2, 0]);
+
+
+    svg.append("text")
+       .attr("transform", "translate(-100,-50)")
+       .attr("x", 200)
+       .attr("y", 70)
+       .attr("font-size", "20px")
+       .text("Human Freedom score from year 2008-2016")
+
+
+var xAxis = d3.axisBottom(x).tickFormat(function(d,i){
+  return "";
+}),
+    xAxis2 = d3.axisBottom(x).tickFormat(function(d,i){
+      return parseInt(2*1000+8+i);
+    }),
+    yAxis = d3.axisLeft(y);
+
+
+
+var brush = d3.brushX()
+    .extent([[0, 0], [width, height2]])
+    .on("brush end", brushed);
+
+var zoom = d3.zoom()
+    .scaleExtent([1, Infinity])
+    .translateExtent([[0, 0], [width, height]])
+    .extent([[0, 0], [width, height]])
+    .on("zoom", zoomed);
+
+var area = d3.area()
+    .curve(d3.curveMonotoneX)
+    .x(function(d) { return x(d.year); })
+    .y0(height)
+    .y1(function(d) { return y(d[menu]); });
+
+var area2 = d3.area()
+    .curve(d3.curveMonotoneX)
+    .x(function(d) { return x2(d.year); })
+    .y0(height2)
+    .y1(function(d) { return y2(d[menu]); });
+
+svg.append("defs").append("clipPath")
+    .attr("id", "clip")
+  .append("rect")
+    .attr("width", width)
+    .attr("height", height);
+
+var focus = svg.append("g")
+    .attr("class", "focus")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var context = svg.append("g")
+    .attr("class", "context")
+    .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+d3.csv("complete_women_data.csv", function(error, data) {
+if (error) throw error;
+
+var data = data.filter(function(d) {
+  return d["country"] === country;
+})
+
+console.log(data);
+
+//var data = {{ data.chart_data | safe }}
+//init(data);
+//function init(data){
+
+
+
+
+
+  x.domain(d3.extent(data, function(d) {
+    return d.year; }));
+  y.domain([0, d3.max(data, function(d) { return d[menu]; })]);
+  x2.domain(x.domain());
+  y2.domain(y.domain());
+
+
+  focus.append("path")
+      .datum(data)
+      .attr("class", "area")
+      .attr("d", area);
+
+  focus.append("g")
+      .attr("class", "axis axis--x")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+      .append("text")
+         .attr("y", height - 330)
+         .attr("x", width - 200)
+         .attr("text-anchor", "end")
+         .attr("stroke", "black")
+         .text("<------Year------->");
+
+
+
+  focus.append("g")
+      .attr("class", "axis axis--y")
+      .call(yAxis)
+      .append("text")
+         .attr("transform", "rotate(-90)")
+         .attr("y", -30)
+         .attr("x", -100)
+         .attr("text-anchor", "end")
+         .attr("stroke", "black")
+         .text("<-------Human Freedom Index------->");
+
+
+  context.append("path")
+      .datum(data)
+      .attr("class", "area")
+      .attr("d", area2);
+
+  context.append("g")
+      .attr("class", "axis axis--x")
+      .attr("transform", "translate(0," + height2 + ")")
+      .call(xAxis2);
+
+  context.append("g")
+      .attr("class", "brush")
+      .call(brush)
+      .call(brush.move, x.range());
+
+  svg.append("rect")
+      .attr("class", "zoom")
+      .attr("width", width)
+      .attr("height", height)
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+      .call(zoom);
+
+});
+
+
+function brushed() {
+  if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom") return; // ignore brush-by-zoom
+  var s = d3.event.selection || x2.range();
+  x.domain(s.map(x2.invert, x2));
+  focus.select(".area").attr("d", area);
+  focus.select(".axis--x").call(xAxis);
+  svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
+      .scale(width / (s[1] - s[0]))
+      .translate(-s[0], 0));
+}
+
+function zoomed() {
+  if (d3.event.sourceEvent && d3.event.sourceEvent.type === "brush") return; // ignore zoom-by-brush
+  var t = d3.event.transform;
+  x.domain(t.rescaleX(x2).domain());
+  focus.select(".area").attr("d", area);
+  focus.select(".axis--x").call(xAxis);
+  context.select(".brush").call(brush.move, x.range().map(t.invertX, t));
+}
+}
+
+</script>

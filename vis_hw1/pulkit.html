@@ -1,0 +1,318 @@
+<!doctype html>
+<html>
+<head>
+    <style>
+        .bar {
+            opacity: 0.8
+        }
+
+    .menu {
+        float: right;
+    }
+    body {
+ background-image: url("fifa.png");
+}
+
+    </style>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+
+<body>
+
+  <div class="menu" id="menu" style="margin-right:500px">
+  Choose a variable:<select id="dropdown" onchange="display(this.value)">
+  <option value="Age">Age</option>
+  <option value="Potential">Potential</option>
+  <option value="Finishing">Finishing</option>
+  <option value="HeadingAccuracy">HeadingAccuracy</option>
+  <option value="ShortPassing">ShortPassing</option>
+  <option value="Volleys">Volleys</option>
+  <option value="Dribbling">Dribbling</option>
+  <option value="LongPassing">LongPassing</option>
+  <option value="BallControl">BallControl</option>
+  <option value="Acceleration">Acceleration</option>
+    </select>
+
+  </div>
+
+
+<input type="hidden" id="height" value="600">
+<input type="hidden" id="width" value="1200">
+
+   <div id="sliderMenu" style="margin-left:200px">Change Number of Bins:<input type="range" min="1" max="20" value="10" id="slider" onchange="changeBin(this.value)"></div>
+
+<script>
+      var selected=document.getElementById('dropdown').value;
+      display(selected,10);
+      //function changeBin changes the no of bins passed by the slider
+      function changeBin(change){
+        console.log(change);
+          var selected=document.getElementById('dropdown').value;
+          window.binSize=change;
+          console.log("binVal is ="+window.binSize);
+          display(selected,window.binSize);
+      }
+
+      //function display displays the bar chart
+    function display(selected,binSize){
+      if(window.binSize==null){
+        window.binSize=10;
+      }
+      var no_bins=window.binSize;
+      document.getElementById('dropdown').style.display=''
+     document.getElementById('menu').style.display=''
+     document.getElementById('sliderMenu').style.display=''
+
+      d3.select("svg").remove();
+      var height=parseInt(document.getElementById('height').value)
+      var width=parseInt(document.getElementById('width').value)
+      d3.select('body').append('svg').attr('height',height).attr('width',width)
+      //console.log("clicked");
+      console.log("selected value is "+selected);
+    var svg = d3.select("svg"),
+        margin = 200,
+        width = svg.attr("width") - margin,
+        height = svg.attr("height") - margin
+
+    var heading=svg.append("text")
+       .attr("transform", "translate(100,-20)")
+       .attr("x", 250)
+       .attr("y", 50)
+       .attr("font-size", "24px")
+       .text("D3: FIFA 19 Visual Statistics of Top 500 Players")
+
+
+
+
+    var xScale = d3.scaleBand().range([0, width]).padding(0.4);
+        yScale = d3.scaleLinear().range([height, 0]);
+
+    var g = svg.append("g")
+               .attr("transform", "translate(" + 100 + "," + 100 + ")");
+
+      var data=d3.csv("data_d3.csv", function(error, data) {
+        if (error) {
+            throw error;
+        }
+
+          //To initialize the number of bins
+          //console.log("no_bins are ="+no_bins)
+          var bins=[];
+          for(var i=0;i<no_bins;i++){
+              bins[i]=0;
+          }
+
+          var min=data[0][selected];
+          //console.log(min);
+          var max=data[0][selected];
+          for(var i=1;i<data.length;i++){
+            if(data[i][selected]>max){ max= data[i][selected]}
+            if(data[i][selected]<min){ min= data[i][selected]}
+          }
+          var size_bins=(max-min)/(no_bins);
+          //console.log(size_bins)
+          var bin_no;
+          //console.log("Before were "+bins.length)
+          bins[0]=1;
+          for(var i=0;i<data.length;i++){
+            bin_no=Math.ceil((data[i][selected]-min)/size_bins);
+            //console.log(data[i][selected]+" falls in bin "+ bin_no-1);
+            //if(data[i][selected]==max){ bins[bin_no-1]=bins[bin_no-1]+1;}
+            //else{
+            bins[bin_no-1]=bins[bin_no-1]+1;
+          //}
+          }
+          //console.log("Total bins are = "+ bins.length)
+          var xdomain=[];
+          var data_plot=[];
+          //data_plot.push({X: parseInt(min), Y: bins[0]});
+          xdomain.push(parseInt(min));
+          for(i=0;i<bins.length;i++){
+            var val=parseInt(min)+parseFloat((i*size_bins).toFixed(1));
+            //console.log(parseInt(min)+(i*size_bins));
+            //console.log(xdomain);
+            xdomain.push(val);
+            data_plot.push({X: val, Y: bins[i]});
+          }
+
+          console.log(data_plot)
+
+        //initialize_bins(data);
+        xScale.domain(xdomain); //provide domain values to the x and y scales, here it's X Scale which is Timestamp
+        //xScale.domain(data.map(function(d) { return bins; }));
+        //console.log(bins[0]);
+        //yScale.domain([0, d3.max(data, function(d) { return d.FixationDuration; })]); // domain value of Fixation Duration to y Scale
+        yScale.domain([0,d3.max(bins)]);
+        g.append("g") //Another group element to have our x-axis grouped under one group element
+         .attr("transform", "translate(0," + height + ")") // We then use the transform attribute to shift our x-axis towards the bottom of the SVG.
+         .call(d3.axisBottom(xScale).tickFormat(function(d){
+           return "("+d+"-"+(d+size_bins).toFixed(1)+"]";
+         })) //We then insert x-axis on this group element using .call(d3.axisBottom(x)).
+         .append("text")
+         .attr("y", height - 350)
+         .attr("x", width - 400)
+         .attr("text-anchor", "end")
+         .attr("stroke", "black")
+         .text(selected+" Group (Bin Size: "+size_bins.toFixed(1)+")");
+
+        g.append("g") //Another group element to have our y-axis grouped under one group element
+         .call(d3.axisLeft(yScale).tickFormat(function(d){ // Try with X Scaling too.
+             return  d;
+         })
+         .ticks(10)) //We have also specified the number of ticks we would like our y-axis to have using ticks(10).
+         .append("text")
+         .attr("transform", "rotate(-90)")
+         .attr("y", 6)
+         .attr("dy", "-5.1em")
+         .attr("x", -150)
+         .attr("text-anchor", "end")
+         .attr("stroke", "black")
+         .text("Frequency");
+         //console.log(data);
+
+         var toolTip=d3.select('body').append('div')
+         .style('position','absolute').style('padding','0px 0px').style('background','white').style('margin-top','40px');
+         var colors = d3.scaleLinear().domain([d3.min(bins),d3.max(bins)]).range(['#ff0c00', '#4ff507']);
+
+
+          var bars=g.selectAll(".bar") //created dynamic bars with our data using the SVG rectangle element.
+         .data(data_plot)
+         .enter().append("rect")
+         //.attr('fill',function(d,i){
+          // return colors(d.Y);
+         //})
+         .attr('opacity',0.8)
+         //.attr("class", "bar") // try to comment this and see the changes
+
+
+         bars.transition().duration(1).delay(function(d,i){
+           return i*100;
+         }).attr('fill',function(d,i){
+           return colors(d.Y);
+         })
+         .attr("x", function(d) { return xScale(d.X); })  //x scale created earlier and pass the year value from our data.
+         .attr("y", function(d) { return yScale(d.Y); }) // pass the data value to our y scale and receive the corresponding y value from the y range.
+         .attr("width", xScale.bandwidth()) //width of our bars would be determined by the scaleBand() function.
+         .attr("height", function(d) { return height - yScale(d.Y); });
+
+         bars.on('mouseover',function(d){
+          d3.select(this).style('cursor','pointer')
+        tempColor=this.style.fill;
+         toolTip.html('<b>'+d.Y+'</b>').style('left',xScale(d.X)+120+'px').style('top',yScale(d.Y)+60+'px')
+         .style('color','black').style('display','');
+         d3.select(this).style('opacity',1)
+         height_bar=d3.select(this).attr('height')
+         width_bar=d3.select(this).attr('width')
+         y_bar=d3.select(this).attr('y')
+
+         d3.select(this).transition().duration(1000)
+         .attr('height',parseInt(height_bar)+parseInt(10)).attr("y",y_bar-10).attr('width',parseInt(width_bar)+parseInt(5))
+         })
+         .on('mouseout',function(d){
+         d3.select(this).style('fill',tempColor).style('opacity',0.8)
+         d3.select(this).transition().duration(1000)
+         .attr('height',parseInt(height_bar)).attr("y",y_bar).attr('width',parseInt(width_bar))
+         toolTip.style('display','none')
+
+         })
+         .on('click',function(){
+
+            data=data_plot;
+            console.log(data);
+            console.log(data_plot);
+           d3.select("svg").remove()
+           toolTip.style('display','none')
+           document.getElementById('dropdown').style.display='none'
+          document.getElementById('menu').style.display='none'
+          document.getElementById('sliderMenu').style.display='none'
+
+           var height=parseInt(document.getElementById('height').value)
+           var width=parseInt(document.getElementById('width').value)
+
+           var text = "", padding = 10, opacity = .8, opacityHover = 1, otherOpacityOnHover = .8,
+           tooltipMargin = 13;
+
+           var radius = Math.min(width-padding, height-padding) / 2;
+           var colors = d3.scaleLinear().domain([d3.min(bins),d3.max(bins)]).range(['#ff0c00', '#4ff507']);
+           var svg = d3.select("body").append('svg').attr('class', 'pie').attr('width', width).attr('height', height);
+
+           var g = svg.append('g')
+           .attr('transform', 'translate(' + (width/2) + ',' + (height/2) + ')');
+
+           var arc = d3.arc()
+           .innerRadius(0)
+           .outerRadius(radius);
+
+           var pie = d3.pie().value(function(d) { return d.Y; }).sort(null);
+           //console.log(data);
+           var path = g.selectAll('path').data(pie(data)).enter().append("g").append('path')
+
+             path.transition().duration(100).delay(function(d,i){
+               return i*100;
+             })
+             .attr('d', arc)
+             .attr('fill', function(d,i){
+               //console.log(d.value);
+               return colors(d.value);
+             }).style('opacity', opacity).style('stroke', 'white')
+
+             path.on("mouseover", function(d) {
+                 d3.selectAll('path')
+                   .style("opacity", otherOpacityOnHover);
+                 d3.select(this)
+                   .style("opacity", opacityHover);
+
+
+                 let g = d3.select("svg")
+                   .style("cursor", "pointer")
+                   .append("g")
+                   .attr("class", "tooltip")
+                   .style("opacity", 0);
+
+                 g.append("text")
+                   .attr("class", "name-text")
+                   .html(`Group [${d.data.X}`+"-"+parseInt(d.data.X+size_bins)+"]"+" Frequency= "+` ${d.data.Y}`)
+                   .attr('text-anchor', 'middle');
+
+                 let text = g.select("text");
+                 let bbox = text.node().getBBox(); // using BBox as normal text was not working with pie charts
+                 let padding = 2;
+                 g.insert("rect", "text")
+                   .attr("x", bbox.x - padding)
+                   .attr("y", bbox.y - padding)
+                   .attr("width", bbox.width + (padding*2))
+                   .attr("height", bbox.height + (padding*2))
+                   .style("fill", "white")
+                   .style("opacity", 0.75);
+               })
+             .on("mousemove", function(d) {
+                   let mousePosition = d3.mouse(this);
+                   let x = mousePosition[0] + width/2;
+                   let y = mousePosition[1] + height/2 - tooltipMargin;
+
+                   d3.select('.tooltip')
+                     .style("opacity", 1)
+                     .attr('transform',`translate(${x}, ${y})`);
+               })
+             .on("mouseout", function(d) {
+                 d3.select("svg")
+                   .style("cursor", "default")
+                   .select(".tooltip").remove();
+               d3.selectAll('path')
+                   .style("opacity", opacity);
+               })
+               .on('click',function(){
+                 var selectedDropdown=document.getElementById('dropdown').value;
+                 display(selectedDropdown);
+               })
+
+
+
+           });
+
+    });
+
+  }
+</script>
+
+</body>
+</html>

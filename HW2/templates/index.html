@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<style>
+
+body { font: 12px Arial;}
+
+path {
+    stroke: steelblue;
+    stroke-width: 2;
+    fill: none;
+}
+
+.dot {
+  stroke: #000;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: grey;
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+svg {
+  font: 10px sans-serif;
+  padding: 10px;
+}
+
+.axis,
+.frame {
+  shape-rendering: crispEdges;
+}
+
+.axis line {
+  stroke: black;
+}
+
+
+.cell text {
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.frame {
+  fill: none;
+  stroke: #aaa;
+}
+
+circle {
+  fill-opacity: .7;
+}
+
+circle.hidden {
+  fill: #ccc !important;
+}
+
+.extent {
+  fill: #000;
+  fill-opacity: .125;
+  stroke: #fff;
+}
+
+.cell text {
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+
+</style>
+<body>
+<div>
+Select graph to see :
+<select id='graph' style='width: 200px' onchange='changeGraph(this.value)'>
+  <option value='original'>Scree plot with original data</option> 
+  <option value='random'>Scree plot with random sampling</option> 
+  <option value='stratified'>Scree plot with stratified sampling</option> 
+  <option value='PCAR'>PCA plot with random sampling</option> 
+  <option value='PCAS'>PCA plot with stratified sampling</option>
+  <option value='MDSER'>MDS(Euclidean) with random sampling</option>
+  <option value='MDSES'>MDS(Euclidean) with stratified sampling</option>
+  <option value='MDSCR'>MDS(correlation) with random sampling</option>
+  <option value='MDSCS'>MDS(correlation) with stratified sampling</option>
+  <option value='MDSMR'>MDS matrix with random sampling</option>
+  <option value='MDSMS'>MDS matrix with stratified sampling</option>
+ 
+</select>
+</div>
+
+<h1 id="display"></h1>
+
+
+<!-- load the d3.js library -->
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+
+<script>
+function init(data){
+d3.selectAll("svg").remove();
+console.log(data);
+// Set the dimensions of the canvas / graph
+var margin = {top: 100, right: 20, bottom: 30, left: 50},
+    width = 700 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+// Set the ranges
+var x = d3.scale.linear().range([0, width]);
+var y = d3.scale.linear().range([height, 0]);
+
+// Define the axes
+var xAxis = d3.svg.axis().scale(x)
+    .orient("bottom").ticks(10);
+
+var yAxis = d3.svg.axis().scale(y)
+    .orient("left").ticks(20);
+
+// Define the line
+var valueline = d3.svg.line()
+    .x(function(d) { return x(d.PCA); })
+    .y(function(d) { return y(d.eigenvalues); });
+
+var valueline2 = d3.svg.line()
+  .x(function(d){ return x(d.PCA);})
+  .y(function(d){ return y(d.eigenvalues);});
+
+// Adds the svg canvas
+var svg = d3.select("body")
+    .append("svg")
+        .attr("width", width + margin.left + margin.right +50)
+        .attr("height", height + margin.top + margin.bottom +50)
+    .append("g")
+        .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+			  
+			 
+	data.forEach(function(d) {
+      d.PCA = +d.PCA;
+      d.eigenvalues = +d.eigenvalues;
+  });
+
+  // Scale the range of the data
+  x.domain([1,d3.max(data, function(d) { return d.PCA; })]);
+  y.domain([d3.min(data, function(d) { return d.eigenvalues; }), d3.max(data, function(d) { return d.eigenvalues+1; })]);
+
+  // Add the valueline path.
+  svg.append("path")
+      .attr("class", "line")
+      .attr("d", valueline(data));
+
+  // Add the X Axis
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis).
+	  append("text")
+      .attr("class", "label")
+      .attr("x", width)
+      .attr("y", 40)
+      .style("text-anchor", "end")
+      .text("PCA Component");
+
+  // Add the Y Axis
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+	  .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -40)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Eigen Values");		  
+			  
+}
+// Get the data
+changeGraph(document.getElementById('graph').value);
+function changeGraph(graph){
+	
+	//alert(graph);
+	if(graph=="random" | graph=="stratified"){
+		//alert("graph is random or stratified");
+		showScree(graph);
+	}
+	else if(graph=="PCAR" | graph=="PCAS"){
+		showPCA(graph);
+	}
+	else if(graph=="MDSER" | graph=="MDSES"){
+		mds_eucledian(graph);
+	}
+	else if(graph=="MDSCR" | graph=="MDSCS"){
+		mds_correlation(graph);
+	}
+	else if(graph=="MDSMR" | graph=="MDSMS"){
+		mds_matrix(graph);
+	}
+	else {var data = {{ data.chart_data | safe }}
+		init(data);}
+	
+}
+
+
+function mds_matrix(graph){
+d3.selectAll("svg").remove();
+document.getElementById("display").innerHTML = "Please wait while your data is loading!"; 
+var width = 960,
+    size = 230,
+    padding = 20;
+
+var x = d3.scale.linear()
+    .range([padding / 2, size - padding / 2]);
+
+var y = d3.scale.linear()
+    .range([size - padding / 2, padding / 2]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom")
+    .ticks(6);
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .ticks(6);
+
+var color = d3.scale.category10();
+
+//d3.csv("flowers.csv", function(error, data) {
+  //if (error) throw error;
+  var url="/mds_matrix"+"?method="+graph;
+	  d3.json(url,function(data){
+data=data["substances"];
+
+  var domainByTrait = {},
+      traits = d3.keys(data[0]).filter(function(d) { return d !== "Cluster"; }),
+      n = traits.length;
+
+  traits.forEach(function(trait) {
+    domainByTrait[trait] = d3.extent(data, function(d) { return d[trait]; });
+  });
+  
+
+  xAxis.tickSize(size * n);
+  yAxis.tickSize(-size * n);
+
+  var svg = d3.select("body").append("svg")
+      .attr("width", size * n + padding)
+      .attr("height", size * n + padding)
+    .append("g")
+      .attr("transform", "translate(" + padding + "," + padding / 2 + ")");
+
+  svg.selectAll(".x.axis")
+      .data(traits)
+    .enter().append("g")
+      .attr("class", "x axis")
+      .attr("transform", function(d, i) { return "translate(" + (n - i - 1) * size + ",0)"; })
+      .each(function(d) { x.domain(domainByTrait[d]); d3.select(this).call(xAxis); });
+
+  svg.selectAll(".y.axis")
+      .data(traits)
+    .enter().append("g")
+      .attr("class", "y axis")
+      .attr("transform", function(d, i) { return "translate(0," + i * size + ")"; })
+      .each(function(d) { y.domain(domainByTrait[d]); d3.select(this).call(yAxis); });
+
+	var cell = svg.selectAll(".cell")
+      .data(cross(traits, traits))
+    .enter().append("g")
+      .attr("class", "cell")
+      .attr("transform", function(d) { return "translate(" + (n - d.i - 1) * size + "," + d.j * size + ")"; })
+      .each(plot);
+	  //console.log(cell);
+	//cell.each(plot);
+  // Titles for the diagonal.
+  cell.filter(function(d) { return d.i === d.j; }).append("text")
+      .attr("x", padding)
+      .attr("y", padding)
+      .attr("dy", ".71em")
+      .text(function(d) { return d.x; });
+	  
+function plot(p) {
+    var cell = d3.select(this);
+
+    x.domain(domainByTrait[p.x]);
+    y.domain(domainByTrait[p.y]);
+
+    cell.append("rect")
+        .attr("class", "frame")
+        .attr("x", padding / 2)
+        .attr("y", padding / 2)
+        .attr("width", size - padding)
+        .attr("height", size - padding);
+
+    cell.selectAll("circle")
+        .data(data)
+      .enter().append("circle")
+        .attr("cx", function(d) { return x(d[p.x]); })
+        .attr("cy", function(d) { return y(d[p.y]); })
+        .attr("r", 4)
+        .style("fill", function(d) { return color(d.Cluster); });
+  }
+ document.getElementById("display").innerHTML = ""; 
+ 
+});
+
+}
+
+function cross(a, b) {
+  var c = [], n = a.length, m = b.length, i, j;
+  for (i = -1; ++i < n;) for (j = -1; ++j < m;) c.push({x: a[i], i: i, y: b[j], j: j});
+  console.log(c);
+  return c;
+}
+
+
+function drawdata(data){
+  //console.log(data)
+  data.forEach(function(d) {
+      d.PCA = +d.PCA;
+      d.eigenvalues = +d.eigenvalues;
+  });
+
+  // Scale the range of the data
+  x.domain([1,d3.max(data, function(d) { return d.PCA; })]);
+  y.domain([d3.min(data, function(d) { return d.eigenvalues; }), d3.max(data, function(d) { return d.eigenvalues+1; })]);
+
+  // Add the valueline path.
+  svg.append("path")
+      .attr("class", "line")
+      .attr("d", valueline(data));
+
+  // Add the X Axis
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
+
+  // Add the Y Axis
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis);
+}
+
+
+
+function showScree(graph) {
+		
+	  var url="/showScree"+"?method="+graph;
+      //$.post("/showScree", {'data': graph}, function(data_infunc){
+	  d3.json(url,function(d){
+	  
+	  console.log(d);
+	  
+     init(d);
+      
+    })	
+	
+}
+
+function mds_eucledian(graph) {
+		
+		document.getElementById("display").innerHTML = "Please wait while your data is loading!"; 
+		
+		d3.selectAll("svg").remove();
+		var margin = {top: 100, right: 20, bottom: 30, left: 50},
+    width = 700 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+	
+	var xValue = function(d) { return d.X;}, // data -> value
+    xScale = d3.scale.linear().range([0, width]), // value -> display
+    xMap = function(d) { return xScale(xValue(d));}, // data -> display
+    xAxis = d3.svg.axis().scale(xScale).orient("bottom");
+
+// setup y
+var yValue = function(d) { return d["Y"];}, // data -> value
+    yScale = d3.scale.linear().range([height, 0]), // value -> display
+    yMap = function(d) { return yScale(yValue(d));}, // data -> display
+    yAxis = d3.svg.axis().scale(yScale).orient("left");
+	
+	var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	
+	
+		
+	  var url="/mds_eucledian"+"?method="+graph;
+	  console.log(url);
+      //$.post("/showPCA", {'data': graph}, function(data_infunc){
+	  d3.json(url,function(data){
+		  // change string (from CSV) into number format
+		  console.log(data);
+		  
+  /*data.forEach(function(d) {
+    d.Calories = +d.Calories;
+    d["PCA2"] = +d["PCA2"];
+//    console.log(d);
+  });*/
+
+  // don't want dots overlapping axis, so add in buffer to data domain
+  xScale.domain([d3.min(data, xValue)-1, d3.max(data, xValue)+1]);
+  yScale.domain([d3.min(data, yValue)-1, d3.max(data, yValue)+1]);
+
+  // x-axis
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+    .append("text")
+      .attr("class", "label")
+      .attr("x", width)
+      .attr("y", -6)
+      .style("text-anchor", "end")
+      .text("PCA1");
+
+  // y-axis
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("PCA2");
+
+  // draw dots
+  if(graph=="MDSER"){
+  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+	.transition().delay(function(d,i){return i*10;})
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", xMap)
+      .attr("cy", yMap)
+	  .style("fill", "black")}
+	  else{
+	  var cValue = function(d) { return d.groups;},
+      color = d3.scale.category10();
+	  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+	.transition().delay(function(d,i){return i*10;})
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", xMap)
+      .attr("cy", yMap)
+	  .style("fill", function(d) { return color(cValue(d));})
+	  }
+		document.getElementById("display").innerHTML = ""; 
+	  });
+	  
+
+}
+
+function mds_correlation(graph) {
+		
+	d3.selectAll("svg").remove();
+	document.getElementById("display").innerHTML = "Please wait while your data is loading!"; 
+	  var url="/mds_correlation"+"?method="+graph;
+	  console.log(url);
+      //$.post("/showPCA", {'data': graph}, function(data_infunc){
+	  d3.json(url,function(data){
+		  // change string (from CSV) into number format
+		  console.log(data);
+			
+		var margin = {top: 100, right: 20, bottom: 30, left: 50},
+    width = 700 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+	
+	var xValue = function(d) { return d.X;}, // data -> value
+    xScale = d3.scale.linear().range([0, width]), // value -> display
+    xMap = function(d) { return xScale(xValue(d));}, // data -> display
+    xAxis = d3.svg.axis().scale(xScale).orient("bottom");
+
+// setup y
+var yValue = function(d) { return d["Y"];}, // data -> value
+    yScale = d3.scale.linear().range([height, 0]), // value -> display
+    yMap = function(d) { return yScale(yValue(d));}, // data -> display
+    yAxis = d3.svg.axis().scale(yScale).orient("left");
+	
+	var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+			
+
+
+		
+
+  // don't want dots overlapping axis, so add in buffer to data domain
+  xScale.domain([d3.min(data, xValue)-1, d3.max(data, xValue)+1]);
+  yScale.domain([d3.min(data, yValue)-1, d3.max(data, yValue)+1]);
+
+  // x-axis
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+    .append("text")
+      .attr("class", "label")
+      .attr("x", width)
+      .attr("y", -6)
+      .style("text-anchor", "end")
+      .text("PCA1");
+
+  // y-axis
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("PCA2");
+document.getElementById("display").innerHTML = ""; 
+  // draw dots
+  if(graph=="MDSCR"){
+  console.log("here in MDSCR");
+  console.log(data);
+  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+	.transition().delay(function(d,i){return i*10;})
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", xMap)
+      .attr("cy", yMap)
+	  .style("fill", "black")}
+	  else{
+	  var cValue = function(d) { return d.groups;},
+      color = d3.scale.category10();
+	  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+	.transition().delay(function(d,i){return i*10;})
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", xMap)
+      .attr("cy", yMap)
+	  .style("fill", function(d) { return color(cValue(d));})
+	  }
+
+	  });
+
+}
+
+
+
+
+
+function showPCA(graph) {
+		
+	d3.selectAll("svg").remove();
+		var margin = {top: 100, right: 20, bottom: 30, left: 50},
+    width = 700 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+	
+	var xValue = function(d) { return d.PCA1;}, // data -> value
+    xScale = d3.scale.linear().range([0, width]), // value -> display
+    xMap = function(d) { return xScale(xValue(d));}, // data -> display
+    xAxis = d3.svg.axis().scale(xScale).orient("bottom");
+
+// setup y
+var yValue = function(d) { return d["PCA2"];}, // data -> value
+    yScale = d3.scale.linear().range([height, 0]), // value -> display
+    yMap = function(d) { return yScale(yValue(d));}, // data -> display
+    yAxis = d3.svg.axis().scale(yScale).orient("left");
+	
+	var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	
+	
+		
+	  var url="/showPCA"+"?method="+graph;
+      //$.post("/showPCA", {'data': graph}, function(data_infunc){
+	  d3.json(url,function(data){
+		  // change string (from CSV) into number format
+		  console.log(data);
+		  
+  /*data.forEach(function(d) {
+    d.Calories = +d.Calories;
+    d["PCA2"] = +d["PCA2"];
+//    console.log(d);
+  });*/
+
+  // don't want dots overlapping axis, so add in buffer to data domain
+  xScale.domain([d3.min(data, xValue)-1, d3.max(data, xValue)+1]);
+  yScale.domain([d3.min(data, yValue)-1, d3.max(data, yValue)+1]);
+
+  // x-axis
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+    .append("text")
+      .attr("class", "label")
+      .attr("x", width)
+      .attr("y", -6)
+      .style("text-anchor", "end")
+      .text("PCA1");
+
+  // y-axis
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("PCA2");
+
+  // draw dots
+  if(graph=="PCAR"){
+  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+	.transition().delay(function(d,i){return i*10;})
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", xMap)
+      .attr("cy", yMap)
+	  .style("fill", "black")}
+	  else{
+	  var cValue = function(d) { return d.groups;},
+      color = d3.scale.category10();
+	  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+	.transition().delay(function(d,i){return i*10;})
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", xMap)
+      .attr("cy", yMap)
+	  .style("fill", function(d) { return color(cValue(d));})
+	  }
+
+	  });
+
+}
+
+
+
+
+</script>
+
+
+</body>
+</html>
